@@ -3,10 +3,14 @@ import path from "path";
 import fs from "fs/promises";
 import cors from "@fastify/cors";
 import { fileURLToPath } from "url";
+import Parser from "rss-parser";
 
 // ES6モジュールで __dirname を使用するための設定
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// RSS パーサーのシングルトンインスタンス
+const parser = new Parser();
 
 // Fastify インスタンスを作成
 const app = fastify({ logger: true });
@@ -49,9 +53,6 @@ async function saveArticles(articles) {
 
 // RSS フィードを取得して解析する
 async function fetchRSSFeed() {
-  const Parser = (await import("rss-parser")).default;
-  const parser = new Parser();
-
   try {
     const feed = await parser.parseURL("https://dev.to/feed");
 
