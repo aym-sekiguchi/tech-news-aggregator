@@ -73,8 +73,8 @@ async function fetchRSSFeed() {
   try {
     const feed = await parser.parseURL("https://dev.to/feed");
 
-    const articles = feed.items.map((item) => ({
-      id: item.guid || item.link,
+    const articles = feed.items.map((item, index) => ({
+      id: item.guid || item.link || `fallback-${Date.now()}-${index}`,
       title: item.title,
       link: item.link,
       description: item.contentSnippet || item.content,
@@ -121,8 +121,8 @@ app.post("/api/articles/refresh", async (request, reply) => {
     const existingArticles = existingData.articles;
 
     // 重複チェック（IDベース）
-    const existingIds = new Set(existingArticles.map((article) => article.id));
-    const uniqueNewArticles = newArticles.filter((article) => !existingIds.has(article.id));
+    const existingIds = new Set(existingArticles.map((article) => article.id).filter((id) => id != null));
+    const uniqueNewArticles = newArticles.filter((article) => article.id != null && !existingIds.has(article.id));
 
     // 新しい記事を先頭に追加
     const updatedArticles = [...uniqueNewArticles, ...existingArticles];
