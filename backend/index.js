@@ -38,17 +38,34 @@ async function loadArticles() {
   try {
     await ensureDataDir();
     const data = await fs.readFile(ARTICLES_FILE, "utf8");
-    return JSON.parse(data);
+    const parsedData = JSON.parse(data);
+
+    // 古い形式（配列）の場合は新しい形式に変換
+    if (Array.isArray(parsedData)) {
+      return {
+        articles: parsedData,
+        lastUpdated: null,
+      };
+    }
+
+    return parsedData;
   } catch (error) {
-    // ファイルが存在しない場合は空の配列を返す
-    return [];
+    // ファイルが存在しない場合は空のデータを返す
+    return {
+      articles: [],
+      lastUpdated: null,
+    };
   }
 }
 
 // 記事データを保存する
-async function saveArticles(articles) {
+async function saveArticles(articles, lastUpdated = new Date().toISOString()) {
   await ensureDataDir();
-  await fs.writeFile(ARTICLES_FILE, JSON.stringify(articles, null, 2));
+  const data = {
+    articles,
+    lastUpdated,
+  };
+  await fs.writeFile(ARTICLES_FILE, JSON.stringify(data, null, 2));
 }
 
 // RSS フィードを取得して解析する
@@ -81,11 +98,11 @@ app.get("/", async (request, reply) => {
 // 記事一覧取得
 app.get("/api/articles", async (request, reply) => {
   try {
-    const articles = await loadArticles();
+    const data = await loadArticles();
     return {
-      articles,
-      total: articles.length,
-      lastUpdated: articles.length > 0 ? new Date().toISOString() : null,
+      articles: data.articles,
+      total: data.articles.length,
+      lastUpdated: data.lastUpdated,
     };
   } catch (error) {
     app.log.error("記事取得エラー:", error);
@@ -100,7 +117,8 @@ app.post("/api/articles/refresh", async (request, reply) => {
     const newArticles = await fetchRSSFeed();
 
     // 既存の記事を読み込み
-    const existingArticles = await loadArticles();
+    const existingData = await loadArticles();
+    const existingArticles = existingData.articles;
 
     // 重複チェック（IDベース）
     const existingIds = new Set(existingArticles.map((article) => article.id));
@@ -112,7 +130,9 @@ app.post("/api/articles/refresh", async (request, reply) => {
     // 最新50件に制限
     const limitedArticles = updatedArticles.slice(0, 50);
 
-    await saveArticles(limitedArticles);
+    // 実際に新しい記事がある場合のみ更新時刻を更新
+    const updateTime = uniqueNewArticles.length > 0 ? new Date().toISOString() : existingData.lastUpdated;
+    await saveArticles(limitedArticles, updateTime);
 
     app.log.info(`${uniqueNewArticles.length} 件の新しい記事を追加しました`);
 
@@ -120,7 +140,7 @@ app.post("/api/articles/refresh", async (request, reply) => {
       message: "記事を更新しました",
       newArticlesCount: uniqueNewArticles.length,
       totalArticles: limitedArticles.length,
-      updatedAt: new Date().toISOString(),
+      updatedAt: updateTime,
     };
   } catch (error) {
     app.log.error("記事更新エラー:", error);
