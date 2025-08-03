@@ -5,7 +5,7 @@ import LoadingSkeleton from "@/components/LoadingSkeleton";
 
 // ページレベルでのキャッシュ設定
 export const revalidate = 300; // 5分間のISR
-export const dynamic = "force-dynamic"; // リアルタイム性を重視
+export const dynamic = "auto"; // Next.jsが自動的に最適な戦略を選択
 
 // ページメタデータ
 export async function generateMetadata() {
